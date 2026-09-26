@@ -20,7 +20,7 @@ def main():
                 with connection_socket:
                     try:
                         prompt = connection_socket.recv(BUFFER_SIZE).decode("utf-8")
-                        response = ask("qwen3:8b", prompt)
+                        response = ask("qwen3:4b", prompt)
                         connection_socket.sendall(response.encode("utf-8"))
                     except Exception as error:
                         print(f"Client error: {error}")
