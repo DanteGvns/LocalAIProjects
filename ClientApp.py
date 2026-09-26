@@ -3,7 +3,7 @@ import socket
 
 portNum = 54783
 ipPrompt = "Please enter the Severs IP address:"
-sendPrompt = "Input lowercase sentence:"
+sendPrompt = "Input prompt:"
 returnPrompt = "From Server: "
 
 def main():

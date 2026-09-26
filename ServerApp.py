@@ -1,5 +1,6 @@
 import sys
 from socket import *
+from OllamaClient import ask
 
 #needed import for ctrl + c stopping
 import signal
@@ -27,11 +28,12 @@ def main():
             #read in 1024 bytes of data and store it as a string
             sentence = connectionSocket.recv(1024).decode()
 
-            #capitalize that string
-            capitalizedSentence = sentence.upper()
+            #send that string into the ollama model and get a response
+            ollamaResponse = ask("phi3", sentence)
 
             #send it back to that client socket
-            connectionSocket.send(capitalizedSentence.encode())
+            connectionSocket.send(ollamaResponse.encode())
+            
         except KeyboardInterrupt:
             print("\nServer shutting down...")
             serverSocket.close()
