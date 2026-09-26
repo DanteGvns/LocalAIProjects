@@ -1,6 +1,9 @@
 import socket
 from OllamaClient import ask
 
+import signal
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 PORT = 54783
 BUFFER_SIZE = 4096
 
