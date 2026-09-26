@@ -1,58 +1,54 @@
-import sys
 import socket
 
-portNum = 54783
-ipPrompt = "Please enter the Severs IP address:"
-sendPrompt = "Input prompt:"
-returnPrompt = "From Server: "
+PORT = 54783
+BUFFER_SIZE = 4096
+
 
 def main():
-    #define clientSocket for later error handling
-    clientSocket = None
+    client_socket = None
 
     try:
-        
-        #get IP address from user
-        #print(ipPrompt)
-        ipAddress = input(ipPrompt)
+        ip_address = input("Please enter the server's IP address: ")
 
-        #Make a port and attenpt to connect with the ip address gotten from user
-        clientSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        clientSocket.connect((ipAddress,portNum))
+        client_socket = socket.create_connection(
+            (ip_address, PORT),
+            timeout=10
+        )
 
-        #get message to send to sever
-        sendMsg = input(sendPrompt)
-        #send message
-        clientSocket.send(sendMsg.encode())
+        # Ollama may take longer than the connection timeout to respond.
+        client_socket.settimeout(None)
 
-        #listen for message from server
-        serverMsg = clientSocket.recv(1024)
-        print (returnPrompt, serverMsg.decode())
+        prompt = input("Input prompt: ")
+        client_socket.sendall(prompt.encode("utf-8"))
 
-        #handling common errors
+        response_chunks = []
+
+        # The server closes this connection after sending its response.
+        while True:
+            chunk = client_socket.recv(BUFFER_SIZE)
+
+            if not chunk:
+                break
+
+            response_chunks.append(chunk)
+
+        response = b"".join(response_chunks).decode("utf-8")
+        print("From server:", response)
+
     except ConnectionRefusedError:
         print("Server not found or not accepting connections.")
-
     except socket.gaierror:
         print("Invalid hostname or DNS lookup failed.")
-
     except TimeoutError:
         print("Connection timed out.")
-
     except KeyboardInterrupt:
         print("\nClient shutting down...")
-        if clientSocket is not None:
-            clientSocket.close()
-        sys.exit(0) 
-
-    except Exception as e:
-        print(f"Error: {e}")
-        exit(1)
-
+    except Exception as error:
+        print(f"Error: {error}")
     finally:
-        #close socket
-        if clientSocket is not None:
-            clientSocket.close()
+        if client_socket is not None:
+            client_socket.close()
+
 
 if __name__ == "__main__":
     main()

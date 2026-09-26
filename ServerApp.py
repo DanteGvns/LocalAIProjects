@@ -1,49 +1,33 @@
-import sys
-from socket import *
+import socket
 from OllamaClient import ask
 
-#needed import for ctrl + c stopping
-import signal
-signal.signal(signal.SIGINT, signal.SIG_DFL)
+PORT = 54783
+BUFFER_SIZE = 4096
 
-portNum = 54783
-severRunning = "The Sever is Running..."
 
 def main():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(("", PORT))
+        server_socket.listen(1)
 
-    #Make a port and listen
-    serverSocket = socket(AF_INET,SOCK_STREAM)
-    serverSocket.bind(('',portNum))
-    serverSocket.listen(1)
+        print("The server is running...")
 
-    #show the server is running
-    print(severRunning)
-
-    #start loop of always waiting for a connection
-    while True:
         try:
-            #accept client and opent a client spesific socket
-            connectionSocket, addr = serverSocket.accept()
+            while True:
+                connection_socket, address = server_socket.accept()
 
-            #read in 1024 bytes of data and store it as a string
-            sentence = connectionSocket.recv(1024).decode()
+                with connection_socket:
+                    try:
+                        prompt = connection_socket.recv(BUFFER_SIZE).decode("utf-8")
+                        response = ask("qwen3:8b", prompt)
+                        connection_socket.sendall(response.encode("utf-8"))
+                    except Exception as error:
+                        print(f"Client error: {error}")
 
-            #send that string into the ollama model and get a response
-            ollamaResponse = ask("phi3", sentence)
-
-            #send it back to that client socket
-            connectionSocket.send(ollamaResponse.encode())
-            
         except KeyboardInterrupt:
             print("\nServer shutting down...")
-            serverSocket.close()
-            sys.exit(0)    
-        except Exception as e:
-            print(f"Error: {e}")
-        finally:
-            #close client spesific socket, main lister remains open and loop restarts
-            connectionSocket.close()
 
-        
+
 if __name__ == "__main__":
     main()
