@@ -1,4 +1,3 @@
-import socket
 from OllamaClient import ask
 
 def offline_assistant():
