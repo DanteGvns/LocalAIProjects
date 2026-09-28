@@ -18,7 +18,7 @@ class OfflineChatGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Local Assistant")
-        self.root.geometry("780x720")
+        self.root.geometry("780x770")
         self.root.minsize(560, 520)
         self.root.configure(bg=self.BG)
 
