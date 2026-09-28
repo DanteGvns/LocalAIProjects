@@ -1,4 +1,5 @@
 import tkinter as tk
+import re
 from queue import Empty, Queue
 from threading import Thread
 from tkinter import ttk
@@ -139,6 +140,72 @@ class OfflineChatGUI:
             "body", foreground=self.TEXT, font=("Segoe UI", 11), spacing3=6
         )
         self.chat_box.tag_configure("error", foreground="#a33a32")
+        self.chat_box.tag_configure(
+            "markdown_h1",
+            foreground=self.TEXT,
+            font=("Segoe UI Semibold", 16),
+            spacing1=12,
+            spacing3=5,
+        )
+        self.chat_box.tag_configure(
+            "markdown_h2",
+            foreground=self.TEXT,
+            font=("Segoe UI Semibold", 14),
+            spacing1=10,
+            spacing3=4,
+        )
+        self.chat_box.tag_configure(
+            "markdown_h3",
+            foreground=self.TEXT,
+            font=("Segoe UI Semibold", 12),
+            spacing1=8,
+            spacing3=3,
+        )
+        self.chat_box.tag_configure(
+            "bold", font=("Segoe UI Semibold", 11)
+        )
+        self.chat_box.tag_configure(
+            "italic", font=("Segoe UI", 11, "italic")
+        )
+        self.chat_box.tag_configure(
+            "inline_code",
+            background="#edf1f3",
+            foreground="#9b342c",
+            font=("Cascadia Mono", 10),
+        )
+        self.chat_box.tag_configure(
+            "code_label",
+            background="#dfe5e8",
+            foreground=self.MUTED,
+            font=("Segoe UI Semibold", 8),
+            lmargin1=14,
+            lmargin2=14,
+            spacing1=8,
+        )
+        self.chat_box.tag_configure(
+            "code",
+            background="#edf1f3",
+            foreground="#26343d",
+            font=("Cascadia Mono", 10),
+            lmargin1=14,
+            lmargin2=14,
+            rmargin=14,
+        )
+        self.chat_box.tag_configure(
+            "list", lmargin1=12, lmargin2=30, spacing1=2, spacing3=2
+        )
+        self.chat_box.tag_configure(
+            "quote",
+            foreground=self.MUTED,
+            font=("Segoe UI", 11, "italic"),
+            lmargin1=18,
+            lmargin2=18,
+            spacing1=4,
+            spacing3=4,
+        )
+        self.chat_box.tag_configure(
+            "rule", foreground=self.BORDER, spacing1=6, spacing3=6
+        )
 
     def _build_composer(self):
         composer = ttk.Frame(self.root, style="Surface.TFrame", padding=(22, 14, 22, 18))
@@ -245,10 +312,92 @@ class OfflineChatGUI:
         else:
             header = f"ASSISTANT  ·  {model}\n" if model else "ASSISTANT\n"
             self.chat_box.insert(tk.END, header, "assistant_header")
-            self.chat_box.insert(tk.END, f"{text}\n", "body")
+            self._insert_markdown(text)
+            self.chat_box.insert(tk.END, "\n", "body")
 
         self.chat_box.configure(state=tk.DISABLED)
         self.chat_box.see(tk.END)
+
+    def _insert_markdown(self, text):
+        in_code_block = False
+
+        for line in text.splitlines():
+            fence = re.match(r"^\s*```\s*([^`]*)$", line)
+            if fence:
+                if in_code_block:
+                    self.chat_box.insert(tk.END, "\n", "body")
+                    in_code_block = False
+                else:
+                    language = fence.group(1).strip().upper() or "CODE"
+                    self.chat_box.insert(tk.END, f" {language}\n", "code_label")
+                    in_code_block = True
+                continue
+
+            if in_code_block:
+                self.chat_box.insert(tk.END, f" {line}\n", "code")
+                continue
+
+            heading = re.match(r"^(#{1,6})\s+(.+)$", line)
+            if heading:
+                level = min(len(heading.group(1)), 3)
+                self._insert_inline(heading.group(2), (f"markdown_h{level}",))
+                self.chat_box.insert(tk.END, "\n", f"markdown_h{level}")
+                continue
+
+            if re.match(r"^\s*([-*_])(?:\s*\1){2,}\s*$", line):
+                self.chat_box.insert(tk.END, "-" * 48 + "\n", "rule")
+                continue
+
+            unordered = re.match(r"^\s*[-*+]\s+(.+)$", line)
+            if unordered:
+                self.chat_box.insert(tk.END, "  \u2022  ", "list")
+                self._insert_inline(unordered.group(1), ("body", "list"))
+                self.chat_box.insert(tk.END, "\n", "list")
+                continue
+
+            ordered = re.match(r"^\s*(\d+)[.)]\s+(.+)$", line)
+            if ordered:
+                self.chat_box.insert(tk.END, f"  {ordered.group(1)}.  ", "list")
+                self._insert_inline(ordered.group(2), ("body", "list"))
+                self.chat_box.insert(tk.END, "\n", "list")
+                continue
+
+            quote = re.match(r"^\s*>\s?(.*)$", line)
+            if quote:
+                self._insert_inline(f"|  {quote.group(1)}", ("quote",))
+                self.chat_box.insert(tk.END, "\n", "quote")
+                continue
+
+            if line.strip():
+                self._insert_inline(line, ("body",))
+                self.chat_box.insert(tk.END, "\n", "body")
+            else:
+                self.chat_box.insert(tk.END, "\n", "body")
+
+        if in_code_block:
+            self.chat_box.insert(tk.END, "\n", "body")
+
+    def _insert_inline(self, text, base_tags=()):
+        token_pattern = re.compile(
+            r"(`[^`\n]+`|\*\*.+?\*\*|__.+?__|(?<!\*)\*[^*\n]+\*|(?<!_)_[^_\n]+_)"
+        )
+        position = 0
+
+        for match in token_pattern.finditer(text):
+            self.chat_box.insert(tk.END, text[position:match.start()], base_tags)
+            token = match.group(0)
+
+            if token.startswith("`"):
+                content, tag = token[1:-1], "inline_code"
+            elif token.startswith(("**", "__")):
+                content, tag = token[2:-2], "bold"
+            else:
+                content, tag = token[1:-1], "italic"
+
+            self.chat_box.insert(tk.END, content, (*base_tags, tag))
+            position = match.end()
+
+        self.chat_box.insert(tk.END, text[position:], base_tags)
 
 
 if __name__ == "__main__":
